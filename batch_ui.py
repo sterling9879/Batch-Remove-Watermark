@@ -33,7 +33,6 @@ def process_videos(
     api_key: str,
     poll_interval: float,
     poll_timeout: float,
-    progress=gr.Progress(track_tqdm=True),
 ) -> Tuple[pd.DataFrame, List[str]]:
     if not api_key:
         raise gr.Error("Forneça a chave de API do WaveSpeed (WAVESPEED_API_KEY).")
@@ -50,7 +49,6 @@ def process_videos(
     downloaded_paths: List[str] = []
     output_dir = Path(tempfile.mkdtemp(prefix="wavespeed_results_"))
 
-    progress(0, desc="Iniciando processamento em lote...")
     valid_files = [video for video in video_files if video is not None]
     if not valid_files:
         raise gr.Error("Nenhum arquivo válido foi enviado.")
@@ -64,7 +62,6 @@ def process_videos(
         if not file_name:
             raise gr.Error("Não foi possível determinar o caminho do arquivo enviado.")
         file_path = Path(file_name)
-        progress(index / total, desc=f"Processando {file_path.name} ({index}/{total})")
         try:
             result = client.process_video(str(file_path), filename=file_path.name)
             if result.status == "succeeded" and result.result_url:
