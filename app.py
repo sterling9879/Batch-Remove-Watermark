@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import os
 import tempfile
 import time
@@ -146,16 +145,6 @@ class WaveSpeedWatermarkRemover:
                 if isinstance(value, str) and value.startswith("http"):
                     return value
         return None
-
-
-# ---------------------------------------------------------------------------
-# Utilidades diversas
-# ---------------------------------------------------------------------------
-
-
-def encode_file_to_base64(path: str) -> str:
-    with open(path, "rb") as file_handle:
-        return base64.b64encode(file_handle.read()).decode("utf-8")
 
 
 def ensure_iterable(files: Iterable | None) -> List:
