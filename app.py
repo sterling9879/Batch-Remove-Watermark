@@ -10,11 +10,6 @@ def main() -> None:
     iface = build_interface(default_api_key=api_key_from_env)
     if not api_key_from_env:
         print("Defina a variável de ambiente WAVESPEED_API_KEY ou informe pela interface.")
-    try:
-        iface = iface.queue()
-    except AttributeError:
-        # Compatibilidade com versões antigas do Gradio sem suporte a queue().
-        pass
     iface.launch(server_name="0.0.0.0", server_port=7860)
 
 
