@@ -73,7 +73,7 @@ class WaveSpeedWatermarkRemover:
             )
         try:
             response.raise_for_status()
-        except requests.HTTPError as exc:  # pragma: no cover - adaptação fina
+        except requests.HTTPError as exc:
             raise WaveSpeedError(f"Falha no upload: {exc}") from exc
         data = response.json()
         upload_url = data.get("url") or data.get("file_url")
@@ -91,7 +91,7 @@ class WaveSpeedWatermarkRemover:
         )
         try:
             response.raise_for_status()
-        except requests.HTTPError as exc:  # pragma: no cover - adaptação fina
+        except requests.HTTPError as exc:
             raise WaveSpeedError(f"Falha ao criar predição: {exc}") from exc
         data = response.json()
         request_id = (
@@ -114,7 +114,7 @@ class WaveSpeedWatermarkRemover:
             )
             try:
                 response.raise_for_status()
-            except requests.HTTPError as exc:  # pragma: no cover - adaptação fina
+            except requests.HTTPError as exc:
                 raise WaveSpeedError(f"Falha ao consultar resultado: {exc}") from exc
             data = response.json()
             status = data.get("status") or data.get("state") or data.get("result", {}).get("status")
@@ -155,6 +155,9 @@ def ensure_iterable(files: Iterable | None) -> List:
     return [files]
 
 
+RESULT_COLUMNS = ["Arquivo", "Request ID", "Status", "Mensagem", "Link do Resultado"]
+
+
 def download_file(url: str, destination_dir: Path, filename: Optional[str] = None) -> Path:
     destination_dir.mkdir(parents=True, exist_ok=True)
     response = requests.get(url, stream=True, timeout=120)
@@ -169,14 +172,12 @@ def download_file(url: str, destination_dir: Path, filename: Optional[str] = Non
     return file_path
 
 
-RESULT_COLUMNS = ["Arquivo", "Request ID", "Status", "Mensagem", "Link do Resultado"]
-
-
 def process_videos(
     video_files: List,
     api_key: str,
     poll_interval: float,
     poll_timeout: float,
+    progress=gr.Progress(track_tqdm=True),
 ) -> Tuple[pd.DataFrame, List[str]]:
     if not api_key:
         raise gr.Error("Forneça a chave de API do WaveSpeed (WAVESPEED_API_KEY).")
@@ -195,8 +196,13 @@ def process_videos(
     records = []
     downloaded_paths: List[str] = []
 
-    for file_info in normalized_files:
+    progress(0, desc="Iniciando processamento em lote...")
+    total = len(normalized_files)
+
+    for index, file_info in enumerate(normalized_files, start=1):
         file_path = _resolve_uploaded_path(file_info)
+        progress(index / total, desc=f"Processando {file_path.name} ({index}/{total})")
+
         try:
             result = client.process_video(str(file_path), filename=file_path.name)
             status_message = (
@@ -214,7 +220,7 @@ def process_videos(
                     downloaded_paths.append(
                         str(download_file(result.result_url, output_dir, filename=file_path.name))
                     )
-                except Exception as download_error:  # pragma: no cover - falha de rede
+                except Exception as download_error:
                     record["Mensagem"] = f"Falha ao baixar resultado: {download_error}"
             records.append(record)
         except WaveSpeedError as api_error:
@@ -227,7 +233,7 @@ def process_videos(
                     "Link do Resultado": "",
                 }
             )
-        except Exception as unexpected_error:  # pragma: no cover - proteção
+        except Exception as unexpected_error:
             records.append(
                 {
                     "Arquivo": file_path.name,
@@ -244,7 +250,6 @@ def process_videos(
 
 def _resolve_uploaded_path(file_info) -> Path:
     """Compatibilidade com diferentes formatos de retorno do componente File."""
-
     if isinstance(file_info, dict) and "name" in file_info:
         return Path(file_info["name"])
     if hasattr(file_info, "name"):
@@ -324,7 +329,7 @@ def main() -> None:
     if not api_key_from_env:
         print("Defina a variável de ambiente WAVESPEED_API_KEY ou informe pela interface.")
     interface = build_interface(default_api_key=api_key_from_env)
-    interface.launch(server_name="0.0.0.0", server_port=7860)
+    interface.queue(concurrency_count=2).launch(server_name="0.0.0.0", server_port=7860)
 
 
 if __name__ == "__main__":
