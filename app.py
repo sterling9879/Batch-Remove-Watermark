@@ -280,9 +280,13 @@ def process_videos(
     def process_single_video(file_info):
         """Processa um único vídeo e retorna o resultado."""
         file_path = _resolve_uploaded_path(file_info)
+        print(f"[INÍCIO] Processando: {file_path.name}")
         
         try:
+            print(f"[UPLOAD] Fazendo upload de: {file_path.name}")
             result = client.process_video(str(file_path), filename=file_path.name)
+            print(f"[SUCESSO] Vídeo processado: {file_path.name} - Status: {result.status}")
+            
             status_message = (
                 "Sucesso" if result.status == "succeeded" else "Verifique a resposta retornada"
             )
@@ -297,15 +301,19 @@ def process_videos(
             downloaded_path = None
             if result.status == "succeeded" and result.result_url:
                 try:
+                    print(f"[DOWNLOAD] Baixando resultado de: {file_path.name}")
                     downloaded_path = str(
                         download_file(result.result_url, output_dir, filename=file_path.name)
                     )
+                    print(f"[OK] Download concluído: {file_path.name}")
                 except Exception as download_error:
+                    print(f"[ERRO DOWNLOAD] {file_path.name}: {download_error}")
                     record["Mensagem"] = f"Falha ao baixar resultado: {download_error}"
             
             return {"success": True, "record": record, "downloaded_path": downloaded_path}
             
         except WaveSpeedError as api_error:
+            print(f"[ERRO API] {file_path.name}: {api_error}")
             return {
                 "success": False,
                 "record": {
@@ -318,6 +326,7 @@ def process_videos(
                 "downloaded_path": None,
             }
         except Exception as unexpected_error:
+            print(f"[ERRO INESPERADO] {file_path.name}: {unexpected_error}")
             return {
                 "success": False,
                 "record": {
@@ -338,15 +347,23 @@ def process_videos(
             for file_info in normalized_files
         }
         
+        # Atualiza progress logo após submissão
+        progress(
+            0.1,
+            desc=f"✓ {total} vídeos enviados para processamento ({account_tier}: {max_workers} workers)"
+        )
+        
         # Processa resultados conforme completam
         for future in as_completed(future_to_file):
             completed += 1
             file_info = future_to_file[future]
             file_path = _resolve_uploaded_path(file_info)
             
+            # Atualiza progresso com mais informações
+            progress_pct = completed / total
             progress(
-                completed / total,
-                desc=f"Processados {completed}/{total} vídeos ({account_tier})"
+                progress_pct,
+                desc=f"✓ {completed}/{total} concluídos ({int(progress_pct * 100)}%) - {account_tier}"
             )
             
             try:
@@ -364,6 +381,7 @@ def process_videos(
                     "Link do Resultado": "",
                 })
 
+    progress(1.0, desc=f"✅ Processamento concluído! {total} vídeos processados")
     df = pd.DataFrame.from_records(records, columns=RESULT_COLUMNS)
     return df, downloaded_paths
 
